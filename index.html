@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NexGenEV • Thermal Command</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<div class="brand">NexGen<b>EV</b>
+<small>THERMAL COMMAND / BTMS</small>
+</div>
+<div class="tag" id="modeBadge">● SIMULATION MODE</div>
+</header>
+<main>
+<section class="top">
+<div>
+<div class="eyebrow">DUAL-LOOP HYBRID COOLING</div>
+<h1>See the heat. Predict the demand.</h1>
+<p style="margin:0">Live telemetry & fuzzy cooling-demand demonstration.</p>
+</div>
+<div class="actions">
+<select id="baud" aria-label="Serial baud rate">
+<option>115200</option>
+<option>9600</option>
+</select>
+<button class="primary" id="connect">Connect ESP32</button>
+<button id="demo">Reset demo</button>
+<button id="export">↓ Export CSV</button>
+</div>
+</section>
+<div class="notice" id="notice">DEMO DATA — simulated readings, not connected to a battery. Pump automation is not connected. Cooling demand ≠ actual pump speed.</div>
+<section class="metrics">
+<div class="card">
+<div class="label">MEASURED TEMPERATURE</div>
+<div class="value" id="temp">-- <span>°C</span>
+</div>
+<div class="sub">One sensor location • not pack Tmax</div>
+</div>
+<div class="card">
+<div class="label">BATTERY CURRENT</div>
+<div class="value" id="current">-- <span>A</span>
+</div>
+<div class="sub">Monitored load • not a fuzzy input</div>
+</div>
+<div class="card">
+<div class="label">FUZZY COOLING DEMAND</div>
+<div class="value" style="color:var(--teal)" id="demand">-- <span>%</span>
+</div>
+<div class="gauge">
+<div id="bar">
+</div>
+</div>
+<div class="sub" id="demandLabel">Waiting for readings</div>
+</div>
+<div class="card">
+<div class="label">ACTUAL PUMP STATUS</div>
+<div class="value" id="pump">NOT VERIFIED</div>
+<div class="sub">No flow / pump feedback connected<br>No hardware commands are sent</div>
+</div>
+</section>
+<section class="grid">
+<div class="card">
+<div class="row">
+<h2>Thermal activity</h2>
+<div class="legend">
+<span>
+<i class="dot">
+</i>Temperature °C</span>
+<span>
+<i class="dot" style="background:var(--blue)">
+</i>Demand %</span>
+</div>
+</div>
+<canvas id="chart" aria-label="Live graph of temperature and calculated cooling demand">
+</canvas>
+<div class="row sub">
+<span>Last 120 samples • independent axes</span>
+<span id="last">Waiting for data</span>
+</div>
+</div>
+<div class="card">
+<div class="row">
+<h2>Fuzzy decision engine</h2>
+<span class="pill">SUGENO · 9 RULES</span>
+</div>
+<div class="pipeline">
+<div class="step">
+<strong>01 / SENSE</strong>Temperature</div>
+<span class="arrow">→</span>
+<div class="step">
+<strong>02 / INFER</strong>Error + rise rate</div>
+<span class="arrow">→</span>
+<div class="step">
+<strong>03 / SHOW</strong>Demand %</div>
+</div>
+<div class="row">
+<span class="sub">Temperature error</span>
+<strong id="error">-- °C</strong>
+</div>
+<div class="row" style="margin-top:13px">
+<span class="sub">Filtered rise rate</span>
+<strong id="rate">-- °C/min</strong>
+</div>
+<div class="status" id="decision">Collecting telemetry…</div>
+<div class="settings">
+<div>
+<label for="target">Demo target temperature</label>
+<input type="number" id="target" value="30" min="10" max="50" step="1"> <span class="sub">°C</span>
+</div>
+<div>
+<label for="alert">Demo warning threshold</label>
+<input type="number" id="alert" value="40" min="15" max="70" step="1"> <span class="sub">°C</span>
+</div>
+</div>
+<p class="sub">Illustrative settings only, not cell-safe limits. A warning is not an automatic cutoff. Independent BMS protection is required.</p>
+</div>
+<div class="card">
+<div class="row">
+<h2>Demo workbench</h2>
+<button class="smallbtn" id="pause">Pause demo</button>
+</div>
+<p class="sub">Move the sliders to test the demand response. Simulation does not model real battery or pump performance.</p>
+<div class="settings">
+<div>
+<label for="simTemp">Temperature stimulus <b id="simTempLabel">32 °C</b>
+</label>
+<input id="simTemp" type="range" min="15" max="55" value="32" step="0.5">
+</div>
+<div>
+<label for="simCurrent">Current stimulus <b id="simCurrentLabel">3 A</b>
+</label>
+<input id="simCurrent" type="range" min="0" max="20" value="3" step="0.1">
+</div>
+</div>
+<div class="log" id="log" aria-live="polite">
+</div>
+</div>
+<div class="card">
+<h2>Rule map <span class="sub">/ consequent demand %</span>
+</h2>
+<table>
+<thead>
+<tr>
+<th>TEMPERATURE ERROR</th>
+<th>FALLING</th>
+<th>STEADY</th>
+<th>RISING</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Below target</td>
+<td>10</td>
+<td>15</td>
+<td>40</td>
+</tr>
+<tr>
+<td>Near target</td>
+<td>20</td>
+<td>35</td>
+<td>65</td>
+</tr>
+<tr>
+<td>Above target</td>
+<td>60</td>
+<td>80</td>
+<td>100</td>
+</tr>
+</tbody>
+</table>
+<details>
+<summary>ESP32 connection & data format</summary>
+<p>Open the downloaded HTML in desktop Chrome / Edge, or use localhost. Close Arduino Serial Monitor first. Click Connect ESP32 and choose its USB port. USB serial may be blocked inside this embedded preview.</p>
+<p>Send one JSON object per line at the selected baud rate:</p>
+<code>{"temperature":32.4,"current":2.5}</code>
+<p>Temperature in °C; current in A. Data must come from your calibrated sensors. No GPIO wiring assumptions are made. Reconnect or restart demo to clear the data history. After 5 seconds without valid data, the demand is marked unavailable.</p>
+</details>
+</div>
+</section>
+<div class="foot">
+<span>NexGenEV / Students Innovation • Hardware demonstration</span>
+<span>Monitoring only · No pump actuation · No battery safety certification</span>
+</div>
+</main>
+<script src="script.js" defer>
+</script>
+</body>
+</html>
